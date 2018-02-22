@@ -101,8 +101,8 @@ The supported column data types are:
 -  ``BIGINT``
 -  ``DOUBLE``
 -  ``VARCHAR`` (or ``STRING``)
--  ``ARRAY<ArrayType>`` (JSON only)
--  ``MAP<VARCHAR, ValueType>`` (JSON only)
+-  ``ARRAY<ArrayType>`` (JSON and AVRO only)
+-  ``MAP<VARCHAR, ValueType>`` (JSON and AVRO only)
 
 KSQL adds the implicit columns ``ROWTIME`` and ``ROWKEY`` to every
 stream and table, which represent the corresponding Kafka message
@@ -118,7 +118,7 @@ The WITH clause supports the following properties:
 +--------------+-------------------------------------------------------+
 | VALUE_FORMAT | Specifies the serialization format of the message     |
 | (required)   | value in the topic. Supported formats: ``JSON``,      |
-|              | ``DELIMITED``                                         |
+|              | ``DELIMITED``, and ``AVRO``                           |
 +--------------+-------------------------------------------------------+
 | KEY          | Associates the message key in the Kafka topic with a  |
 |              | column in the KSQL stream.                            |
@@ -128,6 +128,10 @@ The WITH clause supports the following properties:
 |              | operations such as windowing will process a record    |
 |              | according to this timestamp.                          |
 +--------------+-------------------------------------------------------+
+
+.. include:: includes/ksql-includes.rst
+    :start-line: 2
+    :end-line: 4
 
 Example:
 
@@ -158,8 +162,8 @@ The supported column data types are:
 -  ``BIGINT``
 -  ``DOUBLE``
 -  ``VARCHAR`` (or ``STRING``)
--  ``ARRAY<ArrayType>`` (JSON only)
--  ``MAP<VARCHAR, ValueType>`` (JSON only)
+-  ``ARRAY<ArrayType>`` (JSON and AVRO only)
+-  ``MAP<VARCHAR, ValueType>`` (JSON and AVRO only)
 
 KSQL adds the implicit columns ``ROWTIME`` and ``ROWKEY`` to every
 stream and table, which represent the corresponding Kafka message
@@ -175,7 +179,7 @@ The WITH clause supports the following properties:
 +--------------+-------------------------------------------------------+
 | VALUE_FORMAT | Specifies the serialization format of the message     |
 | (required)   | value in the topic. Supported formats: ``JSON``,      |
-|              | ``DELIMITED``                                         |
+|              | ``DELIMITED``, and ``AVRO``.                          |
 +--------------+-------------------------------------------------------+
 | KEY          | Associates the message key in the Kafka topic with a  |
 |              | column in the KSQL table.                             |
@@ -186,13 +190,17 @@ The WITH clause supports the following properties:
 |              | according to this timestamp.                          |
 +--------------+-------------------------------------------------------+
 
+.. include:: includes/ksql-includes.rst
+    :start-line: 2
+    :end-line: 4
+
 Example:
 
 .. code:: sql
 
     CREATE TABLE users (usertimestamp BIGINT, user_id VARCHAR, gender VARCHAR, region_id VARCHAR)
-      WITH (VALUE_FORMAT = 'JSON',
-            KAFKA_TOPIC = 'my-users-topic');
+        KAFKA_TOPIC = 'my-users-topic',
+        KEY = 'user_id');
 
 CREATE STREAM AS SELECT
 -----------------------
@@ -228,14 +236,15 @@ The WITH clause supports the following properties:
 +--------------+-------------------------------------------------------+
 | VALUE_FORMAT | Specifies the serialization format of the message     |
 |              | value in the topic. Supported formats: ``JSON``,      |
-|              | ``DELIMITED``. If this property is not set, then the  |
-|              | format of the input stream/table will be used.        |
+|              | ``DELIMITED``, and ``AVRO``. If this property is not  |
+|              | set, then the format of the input stream/table is     |
+|              | used.                                                 |
 +--------------+-------------------------------------------------------+
 | PARTITIONS   | The number of partitions in the topic. If this        |
 |              | property is not set, then the number of partitions of |
 |              | the input stream/table will be used.                  |
 +--------------+-------------------------------------------------------+
-| REPLICATIONS | The replication factor for the topic. If this         |
+| REPLICAS     | The replication factor for the topic. If this         |
 |              | property is not set, then the number of replicas of   |
 |              | the input stream/table will be used.                  |
 +--------------+-------------------------------------------------------+
@@ -244,6 +253,10 @@ The WITH clause supports the following properties:
 |              | operations such as windowing will process a record    |
 |              | according to this timestamp.                          |
 +--------------+-------------------------------------------------------+
+
+.. include:: includes/ksql-includes.rst
+    :start-line: 2
+    :end-line: 4
 
 Note: The ``KEY`` property is not supported – use PARTITION BY instead.
 
@@ -279,14 +292,15 @@ The WITH clause supports the following properties:
 +--------------+-------------------------------------------------------+
 | VALUE_FORMAT | Specifies the serialization format of the message     |
 |              | value in the topic. Supported formats: ``JSON``,      |
-|              | ``DELIMITED``. If this property is not set, then the  |
-|              | format of the input stream/table will be used.        |
+|              | ``DELIMITED``, and ``AVRO``. If this property is not  |
+|              | set, then the format of the input stream/table is     |
+|              | used.                                                 |
 +--------------+-------------------------------------------------------+
 | PARTITIONS   | The number of partitions in the topic. If this        |
 |              | property is not set, then the number of partitions of |
 |              | the input stream/table will be used.                  |
 +--------------+-------------------------------------------------------+
-| REPLICATIONS | The replication factor for the topic. If this         |
+| REPLICAS     | The replication factor for the topic. If this         |
 |              | property is not set, then the number of replicas of   |
 |              | the input stream/table will be used.                  |
 +--------------+-------------------------------------------------------+
@@ -295,6 +309,10 @@ The WITH clause supports the following properties:
 |              | operations such as windowing will process a record    |
 |              | according to this timestamp.                          |
 +--------------+-------------------------------------------------------+
+
+.. note::
+    - To use Avro, you must have Confluent Schema Registry enabled and set ``ksql.schema.registry.url`` in your KSQL configuration file.
+    - Avro field names are not case sensitive in KSQL. This matches the KSQL column name behavior.
 
 
 DESCRIBE
@@ -307,9 +325,6 @@ DESCRIBE
     DESCRIBE [EXTENDED] (stream_name|table_name);
 
 **Description**
-
-List the columns in a stream or table along with their data type and
-other attributes.
 
 * DESCRIBE: List the columns in a stream or table along with their data type and other attributes.
 * DESCRIBE EXTENDED: Display DESCRIBE information with additional runtime statistics, Kafka topic details, and the
@@ -360,7 +375,7 @@ Example of describing a table with extended information:
     ------------------------
     messages-per-sec:      4.41   total-messages:       486     last-message: 12/14/17 4:32:23 PM GMT
      failed-messages:         0      last-failed:       n/a
-    (Statistics of the local Ksql Server interaction with the Kafka topic IP_SUM)
+    (Statistics of the local KSQL Server interaction with the Kafka topic IP_SUM)
 
 
 EXPLAIN
@@ -374,8 +389,8 @@ EXPLAIN
 
 **Description**
 
-Show the execution plan for a SQL expression or, given the id of a running query, show the execution plan plus
-additional runtime information and metrics. Statements such as DESCRIBE EXTENDED, for example, show the ids of
+Show the execution plan for a SQL expression or, given the ID of a running query, show the execution plan plus
+additional runtime information and metrics. Statements such as DESCRIBE EXTENDED, for example, show the IDs of
 queries related to a stream or table.
 
 Example of explaining a running query:
@@ -439,6 +454,29 @@ DROP TABLE
 **Description**
 
 Drops an existing table.
+
+PRINT
+-----
+
+.. code:: sql
+
+    PRINT qualifiedName (FROM BEGINNING)? ((INTERVAL | SAMPLE) number)?
+
+**Description**
+
+Print the contents of Kafka topics to the KSQL CLI.
+
+.. important:: SQL grammar defaults to uppercase formatting. You can use quotations (``"``) to print topics that contain lowercase characters.
+
+For example:
+
+.. code:: sql
+
+    ksql> print 'ksql__commands' FROM BEGINNING;
+    Format:JSON
+    {"ROWTIME":1516010696273,"ROWKEY":"\"stream/CLICKSTREAM/create\"","statement":"CREATE STREAM clickstream (_time bigint,time varchar, ip varchar, request varchar, status int, userid int, bytes bigint, agent varchar) with (kafka_topic = 'clickstream', value_format = 'json');","streamsProperties":{}}
+    {"ROWTIME":1516010709492,"ROWKEY":"\"table/EVENTS_PER_MIN/create\"","statement":"create table events_per_min as select userid, count(*) as events from clickstream window  TUMBLING (size 10 second) group by userid;","streamsProperties":{}}
+    ^CTopic printing ceased
 
 SELECT
 ------
@@ -688,6 +726,11 @@ Scalar functions
 |            |                                  | format, extract the  |
 |            |                                  | field that matches   |
 +------------+----------------------------------+----------------------+
+| ARRAYCONTA | ``ARRAYCONTAINS('[1, 2, 3]', 3)` | Given JSON or AVRO   |
+| INS        | `                                | array checks if a    |
+|            |                                  | search value         |
+|            |                                  | contains in it.      |
++------------+----------------------------------+----------------------+
 | FLOOR      | ``FLOOR(col1)``                  | The floor of a value |
 +------------+----------------------------------+----------------------+
 | LCASE      | ``LCASE(col1)``                  | Convert a string to  |
@@ -733,21 +776,24 @@ Scalar functions
 Aggregate functions
 ===================
 
-+-----------------------+-----------------------+-----------------------+
-| Function              | Example               | Description           |
-+=======================+=======================+=======================+
-| COUNT                 | ``COUNT(col1)``       | Count the number of   |
-|                       |                       | rows                  |
-+-----------------------+-----------------------+-----------------------+
-| MAX                   | ``MAX(col1)``         | Return the maximum    |
-|                       |                       | value for a given     |
-|                       |                       | column and window     |
-+-----------------------+-----------------------+-----------------------+
-| MIN                   | ``MIN(col1)``         | Return the minimum    |
-|                       |                       | value for a given     |
-|                       |                       | column and window     |
-+-----------------------+-----------------------+-----------------------+
-| SUM                   | ``SUM(col1)``         | Sums the column       |
-|                       |                       | values                |
-+-----------------------+-----------------------+-----------------------+
++--------+-------------------+------------------------------------------+
+| Functi | Example           | Description                              |
+| on     |                   |                                          |
++========+===================+==========================================+
+| COUNT  | ``COUNT(col1)``   | Count the number of rows                 |
++--------+-------------------+------------------------------------------+
+| MAX    | ``MAX(col1)``     | Return the maximum value for a given     |
+|        |                   | column and window                        |
++--------+-------------------+------------------------------------------+
+| MIN    | ``MIN(col1)``     | Return the minimum value for a given     |
+|        |                   | column and window                        |
++--------+-------------------+------------------------------------------+
+| SUM    | ``SUM(col1)``     | Sums the column values                   |
++--------+-------------------+------------------------------------------+
+| TOPK   | ``TOPK(col1, k)`` | Return the TopK values for the given     |
+|        |                   | column and window                        |
++--------+-------------------+------------------------------------------+
+| TOPKDI | ``TOPKDISTINCT(   | Return the distinct TopK values for the  |
+| STINCT | col1, k)``        | given column and window                  |
++--------+-------------------+------------------------------------------+
 

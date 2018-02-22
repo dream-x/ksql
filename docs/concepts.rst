@@ -9,7 +9,7 @@ Concepts
 Components
 ==========
 
-The main components of KSQL are the KSQL CLI and the KSQL server.
+The main components of KSQL are the CLI, the server, and the experimental web interface.
 
 KSQL CLI
 --------
@@ -30,6 +30,16 @@ data to the target Kafka cluster.
 Servers can run in containers, virtual machines, and bare-metal machines. You can add or remove multiple servers in the
 same resource pool to elastically scale query processing in or out. You can use different resource pools to achieve
 workload isolation.
+
+KSQL Experimental UI
+--------------------
+This version of KSQL includes an [experimental web interface](https://github.com/confluentinc/ksql-experimental-ui). This
+interface provides a simple visual wrapper for the interactive KSQL CLI. The experimental web interface is only intended
+for local development and testing. The KSQL CLI is recommended for production environments.
+
+* By default, the KSQL Experimental UI runs on every KSQL Server and is accessible at ``http://ksqlserver:8080``
+* To disable the experimental UI you must add ``ui.enabled=false`` to the server's configuration file ``ksqlserver.properties``.
+* The UI shares the port with KSQL's REST API, which you can configure via the ``listeners`` configuration property.
 
 ===========
 Terminology

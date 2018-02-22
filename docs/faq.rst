@@ -85,6 +85,7 @@ KSQL currently supports formats:
 
 -  DELIMITED (e.g. CSV)
 -  JSON
+-  Avro (requires Confluent Schema Registry and setting ``ksql.schema.registry.url`` in the KSQL configuration file)
 
 *Support for Apache Avro is expected soon.*
 

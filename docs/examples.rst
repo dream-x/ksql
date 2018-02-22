@@ -7,7 +7,7 @@ These examples use a ``pageviews`` stream and a ``users`` table.
 
 .. contents:: Contents
     :local:
-    :depth: 1
+    :depth: 2
 
 
 Creating streams
@@ -25,8 +25,8 @@ of the values that are stored in the topic. In this example, the values format i
       (viewtime BIGINT, \
        userid VARCHAR, \
        pageid VARCHAR) \
-      WITH (kafka_topic='pageviews-topic', \
-            value_format='DELIMITED');
+      WITH (KAFKA_TOPIC='pageviews-topic', \
+            VALUE_FORMAT='DELIMITED');
 
 **Associating Kafka message keys:** The above statement does not make
 any assumptions about the Kafka message key in the underlying Kafka
@@ -42,9 +42,9 @@ STREAM statement as follows:
       (viewtime BIGINT, \
        userid VARCHAR, \
        pageid VARCHAR) \
-      WITH (kafka_topic='pageviews-topic', \
-            value_format='DELIMITED', \
-            key='pageid');
+     WITH (KAFKA_TOPIC='pageviews-topic', \
+           VALUE_FORMAT='DELIMITED', \
+           KEY='pageid');
 
 **Associating Kafka message timestamps:** If you want to use the value
 of one of the columns as the Kafka message timestamp, you can provide
@@ -60,10 +60,10 @@ timestamp, you can rewrite the above statement as follows:
       (viewtime BIGINT, \
        userid VARCHAR, \
        pageid VARCHAR) \
-      WITH (kafka_topic='pageviews-topic', \
-            value_format='DELIMITED', \
-            key='pageid', \
-            timestamp='viewtime');
+      WITH (KAFKA_TOPIC='pageviews-topic', \
+            VALUE_FORMAT='DELIMITED', \
+            KEY='pageid', \
+            TIMESTAMP='viewtime');
 
 Creating tables
 ---------------
@@ -83,9 +83,9 @@ types, a column of ``array`` type, and a column of ``map`` type:
        userid VARCHAR, \
        interests array<VARCHAR>, \
        contact_info map<VARCHAR, VARCHAR>) \
-      WITH (kafka_topic='users-topic', \
-            key = 'userid',\
-            value_format='JSON');
+      WITH (KAFKA_TOPIC='users-topic', \
+            VALUE_FORMAT='JSON',
+            KEY = 'userid');
 
 
 
@@ -118,9 +118,9 @@ The following statement will generate a new stream,
 .. code:: sql
 
     CREATE STREAM pageviews_transformed \
-      WITH (timestamp='viewtime', \
-            partitions=5, \
-            value_format='JSON') AS \
+      WITH (TIMESTAMP='viewtime', \
+            PARTITIONS=5, \
+            VALUE_FORMAT='JSON') AS \
       SELECT viewtime, \
              userid, \
              pageid, \
@@ -136,9 +136,9 @@ write multiple KSQL statements as follows:
 .. code:: sql
 
     CREATE STREAM pageviews_transformed_priority_1 \
-      WITH (timestamp='viewtime', \
-            partitions=5, \
-            value_format='JSON') AS \
+      WITH (TIMESTAMP='viewtime', \
+            PARTITIONS=5, \
+            VALUE_FORMAT='JSON') AS \
       SELECT viewtime, \
              userid, \
              pageid, \
@@ -150,9 +150,9 @@ write multiple KSQL statements as follows:
 .. code:: sql
 
     CREATE STREAM pageviews_transformed_priority_2 \
-      WITH (timestamp='viewtime', \
-            partitions=5, \
-            value_format='JSON') AS \
+          WITH (TIMESTAMP='viewtime', \
+                PARTITIONS=5, \
+                VALUE_FORMAT='JSON') AS \
       SELECT viewtime, \
              userid, \
              pageid, \
@@ -290,12 +290,128 @@ zipcode for each user:
              regionid \
       FROM pageviews_enriched;
 
+Avro format and integration with Confluent Schema Registry
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. contents::
+    :local:
+
+Supported functionality
+^^^^^^^^^^^^^^^^^^^^^^^
+
+KSQL can read and write messages in Avro format by integrating with
+:ref:`Confluent Schema
+Registry <schemaregistry_intro>`.
+KSQL will automatically retrieve (read) and register (write) Avro
+schemas as needed and thus save you from both having to manually define
+columns and data types in KSQL as well as from manual interaction with
+the schema registry.
+
+Currently KSQL supports Avro data in the values of Kafka messages:
+
++-------------+-------------------+----------------------------+
+|             | Message Key       | Message Value              |
++=============+===================+============================+
+| Avro format | Not supported yet | Supported (read and write) |
++-------------+-------------------+----------------------------+
+
+What is not supported yet:
+
+-  Message keys in Avro format. Message keys in KSQL are always
+   interpreted as STRING format, which means KSQL will ignore any Avro
+   schemas that have been registered for message keys.
+-  Avro schemas with nested fields because KSQL does not yet supported
+   nested columns.
+
+Configuring KSQL for Avro
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You must configure the API endpoint of Confluent Schema Registry by
+setting ``ksql.schema.registry.url`` (default:
+``http://localhost:8081``) in the KSQL configuration file that you use
+to start KSQL. You *should not* use ``SET`` to configure the registry
+endpoint.
+
+Using Avro in KSQL
+^^^^^^^^^^^^^^^^^^
+
+First you must ensure that:
+
+1. Confluent Schema Registry is up and running.
+2. ``ksql.schema.registry.url`` is set correctly in KSQL (see previous
+   section).
+
+Then you can use ``CREATE STREAM`` and ``CREATE TABLE`` statements to
+read from Kafka topics with Avro-formatted data and ``CREATE STREAM AS``
+and ``CREATE TABLE AS`` statements to write Avro-formatted data into
+Kafka topics.
+
+Example: Create a new stream ``pageviews`` by reading from a Kafka topic
+with Avro-formatted messages.
+
+.. code:: sql
+
+    CREATE STREAM pageviews
+      WITH (KAFKA_TOPIC='pageviews-avro-topic',
+            VALUE_FORMAT='AVRO');
+
+Example: Create a new table ``users`` by reading from a Kafka topic with
+Avro-formatted messages.
+
+.. code:: sql
+
+    CREATE TABLE users
+      WITH (KAFKA_TOPIC='users-avro-topic',
+            VALUE_FORMAT='AVRO',
+            KEY='userid');
+
+Note how in the above example you don’t need to define any columns or
+data types in the CREATE statement because KSQL will automatically infer
+this information from the latest registered Avro schema for topic
+``pageviews-avro-topic`` (i.e., the latest schema at the time the
+statement is first executed).
+
+If you want to create a STREAM or TABLE with only a subset of all the
+available fields in the Avro schema, then you must explicitly define the
+columns and data types.
+
+Example: Create a new stream ``pageviews_reduced``, similar to the
+previous example, but with only a few of all the available fields in the
+Avro data (here, only the two columns ``viewtime`` and ``pageid`` are
+picked).
+
+.. code:: sql
+
+    CREATE STREAM pageviews_reduced (viewtime BIGINT, pageid VARCHAR)
+      WITH (KAFKA_TOPIC='pageviews-avro-topic',
+            VALUE_FORMAT='AVRO');
+
+KSQL allows you to work with streams and tables regardless of their
+underlying data format. This means that you can easily mix and match
+streams and tables with different data formats (e.g. join a stream
+backed by Avro data with a table backed by JSON data) and also convert
+easily between data formats.
+
+Example: Convert a JSON stream into an Avro stream.
+
+.. code:: sql
+
+    CREATE STREAM pageviews_json (viewtime BIGINT, userid VARCHAR, pageid VARCHAR)
+      WITH (KAFKA_TOPIC='pageviews-json-topic', VALUE_FORMAT='JSON');
+
+    CREATE STREAM pageviews_avro
+      WITH (VALUE_FORMAT = 'AVRO') AS
+      SELECT * FROM pageviews_json;
+
+Note how you only need to set ``VALUE_FORMAT`` to Avro to achieve the
+data conversion. Also, KSQL will automatically generate an appropriate
+Avro schema for the new ``pageviews_avro`` stream, and it will also
+register the schema with Confluent Schema Registry.
+
 Running KSQL
 ------------
 
-KSQL supports various :ref:`modes of
-operation <modes-of-operation>`, including a standalone
-mode and a client-server mode.
+KSQL supports various :ref:`modes of operation <modes-of-operation>`, including a standalone mode and a client-server mode.
 
 Additionally, you can also instruct KSQL to execute a single statement
 from the command line. The following example command runs the given
